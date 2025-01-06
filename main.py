@@ -3,89 +3,61 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 from datetime import datetime
-import json
-import requests
+import logging
 
-def fetch_data():
-    """
-    Function to fetch the air quality data from a provided API endpoint or URL.
-    In this example, it's shown with a static file method.
-    """
+# Set up logging for debug
+logging.basicConfig(level=logging.INFO)
+
+def load_data(file_path):
+    """Load data from a CSV file."""
     try:
-        # For demonstration, replace the URL with an actual data source URL or file path
-        url = "https://example.com/adel_qual_index.json"
-        
-        # Load data
-        response = requests.get(url)
-        data = json.loads(response.text)
-        
-        # Convert the JSON data into a Pandas DataFrame
-        df = pd.DataFrame(data)
-        return df
-    except requests.exceptions.RequestException as e:
-        print(f"Error fetching data: {e}")
-        return pd.DataFrame()
+        data = pd.read_csv(file_path, parse_dates=['timestamp'])
+        logging.info("Data loaded successfully.")
+    except FileNotFoundError:
+        logging.error("The file was not found.")
+        return None
+    except Exception as e:
+        logging.error(f"Error loading data: {e}")
+        return None
+    return data
 
-def preprocess_data(df):
-    """
-    Function to preprocess the air quality data.
-    This includes handling missing values, formatting datetime, and filtering relevant columns.
-    """
-    try:
-        # Ensure datetime is in proper format
-        df['timestamp'] = pd.to_datetime(df['timestamp'])
+def preprocess_data(data):
+    """Preprocess the data by handling missing values and converting timestamp."""
+    if data is not None:
+        # Fill missing values with median value of the column
+        data.fillna(data.median(), inplace=True)
+        logging.info("Data preprocessing completed.")
+    else:
+        logging.warning("No data to preprocess.")
+    return data
+
+def visualize_data(data):
+    """Visualize air quality data for key pollutants."""
+    if data is not None:
+        sns.set(style="whitegrid")
+        plt.figure(figsize=(15, 10))
+
+        # Create a line plot for each pollutant
+        pollutants = ["PM2.5", "PM10", "NO2", "SO2", "O3", "CO"]
+        for pollutant in pollutants:
+            sns.lineplot(x='timestamp', y=pollutant, data=data, label=pollutant)
         
-        # Filtering the desired parameters
-        df = df[['timestamp', 'station_id', 'PM2.5', 'PM10']]
-
-        # Handle missing values by forward filling
-        df = df.fillna(method='ffill')
-
-    except KeyError as e:
-        print(f"Data is missing expected columns: {e}")
-    
-    return df
-
-def visualize_data(df):
-    """
-    Function to visualize PM2.5 and PM10 levels over time.
-    Uses seaborn for a better aesthetic.
-    """
-    sns.set(style="whitegrid")
-    plt.figure(figsize=(14, 7))
-    
-    try:
-        # Plot PM2.5 and PM10 levels
-        sns.lineplot(data=df, x='timestamp', y='PM2.5', hue='station_id', palette='tab10', label='PM2.5', linestyle='-')
-        sns.lineplot(data=df, x='timestamp', y='PM10', hue='station_id', palette='tab20', label='PM10', linestyle='--')
-        
-        plt.title("PM2.5 and PM10 Levels Over Time in Abu Dhabi")
-        plt.xlabel("Date")
-        plt.ylabel("Concentration (µg/m³)")
-        plt.legend(title='Parameter Levels')
+        plt.title('Air Quality Index Trends (Abu Dhabi)')
+        plt.xlabel('Time')
+        plt.ylabel('Concentration (µg/m³)')
+        plt.legend(title='Pollutants')
         plt.xticks(rotation=45)
         plt.tight_layout()
+        
         plt.show()
-
-    except Exception as e:
-        print(f"Error during visualization: {e}")
+    else:
+        logging.warning("No data to visualize.")
 
 def main():
-    # Initial data fetch
-    df = fetch_data()
-    
-    if df.empty:
-        print("No data available to analyze.")
-        return
-
-    # Preprocess the data
-    df_clean = preprocess_data(df)
-    
-    if not df_clean.empty:
-        # Visualization
-        visualize_data(df_clean)
-    else:
-        print("No clean data available for analysis.")
+    file_path = 'path_to_abu_dhabi_air_quality_data.csv'  # Update with the correct path
+    data = load_data(file_path)
+    processed_data = preprocess_data(data)
+    visualize_data(processed_data)
 
 if __name__ == "__main__":
     main()
